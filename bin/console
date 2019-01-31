@@ -1,0 +1,10 @@
+#!/usr/bin/env php
+<?php
+
+require __DIR__.'/../vendor/autoload.php';
+
+use App\Application\Application;
+use App\Component\DotEnv\DotEnv;
+
+(new DotEnv(__DIR__.'/../'))->load();
+(new Application())->run();

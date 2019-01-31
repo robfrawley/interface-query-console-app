@@ -1,0 +1,36 @@
+---
+
+##
+# This file is part of the `src-run/vermicious-console-io-library` project.
+#
+# (c) Rob Frawley 2nd <rmf@src.run>
+#
+# For the full copyright and license information, view the LICENSE.md
+# file distributed with this source code.
+##
+
+sudo     : false
+language : php
+php      : [ 7.1, 7.2, 7.3, nightly ]
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - php: nightly
+
+git:
+  depth : 3
+
+env:
+  global:
+
+install :
+  - bash .bldr/bldr -b up
+
+script :
+  - vendor/bin/simple-phpunit || vendor/bin/phpunit
+
+after_script :
+  - bash .bldr/bldr -b down
+
+...

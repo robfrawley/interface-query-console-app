@@ -11,7 +11,7 @@
 
 namespace App\Utility\Interpolation;
 
-use SR\Console\IO\Utility\Interpolation\Error\InterpolationError;
+use App\Utility\Interpolation\Error\InterpolationError;
 use SR\Dumper\VarDumper\ReturnDumper;
 use SR\Exception\Logic\InvalidArgumentException;
 
@@ -159,18 +159,15 @@ abstract class AbstractInterpolator
     }
 
     /**
-     * @param \Closure|null $errHandler
+     * @param \Closure|null $handler
      *
      * @return self
      */
-    public function setUpErrHandler(?\Closure $errHandler = null): self
+    public function setUpErrHandler(?\Closure $handler = null): self
     {
-        $this->errHandler = $errHandler ?? function (\Exception $exception = null) {
+        $this->errHandler = $handler ?? function (\Exception $exception = null) {
             $this->errHistory[] = new InterpolationError(
-                $this->stringFormat,
-                $this->replacements,
-                new \DateTime(),
-                $exception
+                $this->stringFormat, $this->replacements, new \DateTime(), $exception
             );
 
             return $this->stringFormat;

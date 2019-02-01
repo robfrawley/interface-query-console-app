@@ -7,12 +7,51 @@ use App\Component\Configuration\Exception\LoadException;
 use App\Component\Configuration\Exception\ParseException;
 use App\Component\Filesystem\Path;
 use App\Utility\Interpolation\PsrInterpolator;
+use Ramsey\Uuid\Uuid;
 use SR\Utilities\Interpreter\Interpreter;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 
 abstract class Configuration
 {
+    /**
+     * @var string[]
+     */
+    protected const LOCATION_APP_CONFIG = [
+        'application.yaml',
+        '{self.conf}',
+    ];
+
+    /**
+     * @var string[]
+     */
+    protected const MAP_NAME = ['name'];
+
+    /**
+     * @var string[]
+     */
+    protected const MAP_DESC = ['desc'];
+
+    /**
+     * @var string[]
+     */
+    protected const MAP_VERSION_MAJOR = ['version', 'major'];
+
+    /**
+     * @var string[]
+     */
+    protected const MAP_VERSION_MINOR = ['version', 'minor'];
+
+    /**
+     * @var string[]
+     */
+    protected const MAP_VERSION_PATCH = ['version', 'patch'];
+
+    /**
+     * @var string[]
+     */
+    protected const MAP_VERSION_EXTRA = ['version', 'extra'];
+
     /**
      * @var string[]
      */
@@ -24,7 +63,7 @@ abstract class Configuration
     private $files = [];
 
     /**
-     * @var string|null
+     * @var Path|null
      */
     private $path;
 
@@ -32,6 +71,11 @@ abstract class Configuration
      * @var mixed[]
      */
     private $data = [];
+
+    /**
+     * @var string[]
+     */
+    private $namespace = [];
 
     /**
      * @param string|null $file
@@ -54,6 +98,80 @@ abstract class Configuration
     public function __get(string $name)
     {
         return $this->data[$name] ?? null;
+    }
+
+    /**
+     * @return string
+     */
+    public function __toString(): string
+    {
+        try {
+            return ($path = $this->getPath())
+                ? $path->buildResolved()
+                : Uuid::uuid5(Uuid::NAMESPACE_OID, spl_object_id($this))->toString();
+        } catch (\Exception $e) {
+            return Uuid::NIL;
+        }
+    }
+
+    /**
+     * @param string ...$indices
+     *
+     * @return self
+     */
+    public function setNamespace(string ...$indices): self
+    {
+        $this->namespace = $indices;
+
+        return $this;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getNamespace(): array
+    {
+        return $this->namespace;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasName(): bool
+    {
+        return $this->has(...self::MAP_NAME);
+    }
+
+    /**
+     * @param string|null $default
+     *
+     * @return string|null
+     */
+    public function getName(?string $default = 'Undefined Application Name'): ?string
+    {
+        return $this->getIfValidOrUseDefault(
+            self::useNonEmptyScalarChecker(), $default, ...self::MAP_NAME
+        );
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasDesc(): bool
+    {
+        return $this->has(...self::MAP_DESC);
+    }
+
+    /**
+     * @param string|null $default
+     *
+     * @return string|null
+     */
+    public function getDesc(?string $default = 'Undefined Application Desc'): ?string
+    {
+        return $this->getIfValidOrUseDefault(
+            self::useNonEmptyScalarChecker(), $default, ...self::MAP_DESC
+        );
     }
 
     /**
@@ -85,9 +203,9 @@ abstract class Configuration
     }
 
     /**
-     * @return string|null
+     * @return Path|null
      */
-    public function getPath(): ?string
+    public function getPath(): ?Path
     {
         return $this->path;
     }
@@ -117,11 +235,76 @@ abstract class Configuration
      */
     public function get(string ...$indices)
     {
-        do {
-            $data = ($data ?? $this->data)[array_shift($indices)] ?? null;
-        } while (null !== $data && count($indices) > 0);
+        array_unshift($indices, ...$this->namespace);
 
-        return $data;
+        do {
+            $v = ($v ?? $this->data)[array_shift($indices)] ?? null;
+        } while (null !== $v && count($indices) > 0);
+
+        return $v;
+    }
+
+    /**
+     * @param callable|null $checker
+     * @param string        ...$indices
+     *
+     * @return mixed|null
+     */
+    public function getIfValidOrUseNullVal(callable $checker = null, string ...$indices)
+    {
+        return $this->getIfValidOrUseDefault($checker, null, ...$indices);
+    }
+
+    /**
+     * @param callable|null $checker
+     * @param null          $default
+     * @param string        ...$indices
+     *
+     * @return mixed|null
+     */
+    public function getIfValidOrUseDefault(callable $checker = null, $default = null, string ...$indices)
+    {
+        return ($checker ?? self::getDefaultValidator())($v = $this->get(...$indices)) ? $v : $default;
+    }
+
+    /**
+     * @return \Closure
+     */
+    protected static function useNonEmptyScalarChecker(): \Closure
+    {
+        return function ($value): bool {
+            return is_scalar($value) && (!empty($value) || mb_strlen((string) $value) > 0);
+        };
+    }
+
+    /**
+     * @return \Closure
+     */
+    protected static function useNonEmptyArrayChecker(): \Closure
+    {
+        return function ($value): bool {
+            return is_array($value) && !empty($value);
+        };
+    }
+
+    /**
+     * @return \Closure
+     */
+    protected static function usePositiveIntegerChecker(): \Closure
+    {
+        return function ($value): bool {
+            return is_int($value) && $value >= 0;
+        };
+    }
+
+    /**
+     * @return \Closure
+     */
+    private static function getDefaultValidator(): \Closure
+    {
+        return function ($value): bool {
+            return !empty($value);
+        };
     }
 
     /**
@@ -131,7 +314,7 @@ abstract class Configuration
     {
         foreach ($this->roots as $root) {
             foreach ($this->files as $file) {
-                if ($this->data = $this->loadFile((new Path($root, $file))->buildResolved())) {
+                if ($this->data = $this->loadFile(($this->path = new Path($root, $file))->resolve()->build())) {
                     break 2;
                 }
             }

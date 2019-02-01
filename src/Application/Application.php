@@ -4,24 +4,54 @@ namespace App\Application;
 
 use App\Command\WirelessCommand;
 use App\Component\Configuration\AppConfiguration;
+use App\Component\Configuration\Exception\AppLoadConfigException;
+use App\Component\Configuration\Exception\LoadException;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
 class Application extends SymfonyApplication
 {
     /**
-     * @param string|null $name
-     * @param string|null $version
+     * @var AppConfiguration
      */
-    public function __construct(string $name = null, string $version = null)
+    private $config;
+
+    public function __construct()
     {
-        $appConfig = new AppConfiguration();
-        dump($appConfig);
+        $this->config = $this->initializeConfiguration();
 
         parent::__construct(
-            $name ?? 'Interface Query',
-            $version ?? getenv('APP_VER') ?? '0.0.0'
+            $this->config->getName(),
+            $this->config->stringifyVersion()
         );
 
-        $this->add(new WirelessCommand());
+        $this->initializeCommands(
+            WirelessCommand::class
+        );
+    }
+
+    /**
+     * @return AppConfiguration
+     */
+    private function initializeConfiguration(): AppConfiguration
+    {
+        try {
+            $config = new AppConfiguration();
+        } catch (LoadException $exception) {
+            throw new AppLoadConfigException(
+                $this, null, 'Failed to load application "%s" YAML config file: "%s"', get_called_class(), (string) $config
+            );
+        } finally {
+            return $config;
+        }
+    }
+
+    /**
+     * @param string ...$classList
+     */
+    private function initializeCommands(string ...$classList): void
+    {
+        foreach ($classList as $class) {
+            $this->add(new $class($this->config));
+        }
     }
 }

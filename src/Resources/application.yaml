@@ -1,8 +1,16 @@
-command:
-  name: 'interface-query'
-  desc: 'Interface Query'
+application:
+  call: 'interface-query'
+  name: 'Interface Query'
+  desc: 'Retrieve requested data values for the specified wireless interfaces.'
   version:
-    major: 1
-    minor: 0
+    major: 0
+    minor: 1
     patch: 0
-    typed: null
+    extra: null
+  commands:
+    wireless:
+      name: 'wireless'
+      desc: 'Retrieve requested data values for the specified wireless interfaces'
+      interface:
+        type: 'wireless'
+        find: 'wl'

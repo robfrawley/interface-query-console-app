@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the `src-run/interface-query-console-app` project.
+ *
+ * (c) Rob Frawley 2nd <rmf@src.run>
+ *
+ * For the full copyright and license information, please view the LICENSE.md
+ * file that was distributed with this source code.
+ */
+
 namespace App\Component\Configuration;
 
 use App\Component\Configuration\Exception\IOException;
@@ -25,32 +34,23 @@ abstract class Configuration
     /**
      * @var string[]
      */
-    protected const MAP_NAME = ['name'];
+    protected const MAP_NAME = [
+        'name',
+    ];
 
     /**
      * @var string[]
      */
-    protected const MAP_DESC = ['desc'];
+    protected const MAP_CALL = [
+        'call',
+    ];
 
     /**
      * @var string[]
      */
-    protected const MAP_VERSION_MAJOR = ['version', 'major'];
-
-    /**
-     * @var string[]
-     */
-    protected const MAP_VERSION_MINOR = ['version', 'minor'];
-
-    /**
-     * @var string[]
-     */
-    protected const MAP_VERSION_PATCH = ['version', 'patch'];
-
-    /**
-     * @var string[]
-     */
-    protected const MAP_VERSION_EXTRA = ['version', 'extra'];
+    protected const MAP_DESC = [
+        'desc',
+    ];
 
     /**
      * @var string[]
@@ -137,6 +137,26 @@ abstract class Configuration
     /**
      * @return bool
      */
+    public function hasCall(): bool
+    {
+        return $this->has(...self::MAP_CALL);
+    }
+
+    /**
+     * @param string|null $default
+     *
+     * @return string|null
+     */
+    public function getCall(?string $default = 'undefined-application-calling-name'): ?string
+    {
+        return $this->getIfValidOrUseDefault(
+            self::useNonEmptyScalarChecker(), $default, ...self::MAP_CALL
+        );
+    }
+
+    /**
+     * @return bool
+     */
     public function hasName(): bool
     {
         return $this->has(...self::MAP_NAME);
@@ -147,7 +167,7 @@ abstract class Configuration
      *
      * @return string|null
      */
-    public function getName(?string $default = 'Undefined Application Name'): ?string
+    public function getName(?string $default = 'Undefined Application Display Name'): ?string
     {
         return $this->getIfValidOrUseDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_NAME
@@ -181,7 +201,7 @@ abstract class Configuration
      */
     public function addSearchFile(string $file): self
     {
-        if (!in_array($file = self::interpolatePath($file), $this->files)) {
+        if (!in_array($file = self::interpolatePath($file), $this->files, true)) {
             $this->files[] = $file;
         }
 
@@ -195,7 +215,7 @@ abstract class Configuration
      */
     public function addSearchRoot(string $root): self
     {
-        if (!in_array($root = self::interpolatePath($root), $this->roots)) {
+        if (!in_array($root = self::interpolatePath($root), $this->roots, true)) {
             $this->roots[] = $root;
         }
 
@@ -235,7 +255,7 @@ abstract class Configuration
      */
     public function get(string ...$indices)
     {
-        array_unshift($indices, ...$this->namespace);
+        $indices = $this->namespaceIndices($indices);
 
         do {
             $v = ($v ?? $this->data)[array_shift($indices)] ?? null;
@@ -265,6 +285,22 @@ abstract class Configuration
     public function getIfValidOrUseDefault(callable $checker = null, $default = null, string ...$indices)
     {
         return ($checker ?? self::getDefaultValidator())($v = $this->get(...$indices)) ? $v : $default;
+    }
+
+    /**
+     * @return self
+     */
+    public function load(): self
+    {
+        foreach ($this->roots as $root) {
+            foreach ($this->files as $file) {
+                if ($this->data = $this->loadFile(($this->path = new Path($root, $file))->resolve()->build())) {
+                    break 2;
+                }
+            }
+        }
+
+        return $this;
     }
 
     /**
@@ -308,19 +344,17 @@ abstract class Configuration
     }
 
     /**
-     * @return self
+     * @param array $indices
+     *
+     * @return array
      */
-    public function load(): self
+    private function namespaceIndices(array $indices): array
     {
-        foreach ($this->roots as $root) {
-            foreach ($this->files as $file) {
-                if ($this->data = $this->loadFile(($this->path = new Path($root, $file))->resolve()->build())) {
-                    break 2;
-                }
-            }
+        if (array_slice($indices, 0, count($this->namespace)) !== $this->namespace) {
+            array_unshift($indices, ...$this->namespace);
         }
 
-        return $this;
+        return $indices;
     }
 
     /**

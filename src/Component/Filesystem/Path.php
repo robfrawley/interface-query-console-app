@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the `src-run/interface-query-console-app` project.
+ *
+ * (c) Rob Frawley 2nd <rmf@src.run>
+ *
+ * For the full copyright and license information, please view the LICENSE.md
+ * file that was distributed with this source code.
+ */
+
 namespace App\Component\Filesystem;
 
 use Ramsey\Uuid\Uuid;
@@ -41,7 +50,7 @@ final class Path implements \Countable, \IteratorAggregate
      */
     public function count(): int
     {
-        return sizeof($this->components);
+        return count($this->components);
     }
 
     /**
@@ -169,7 +178,6 @@ final class Path implements \Countable, \IteratorAggregate
      */
     public function prepend(string ...$components): self
     {
-
         array_unshift(
             $this->components, ...self::normalizeComponents($components)
         );
@@ -293,12 +301,12 @@ final class Path implements \Countable, \IteratorAggregate
             );
         }
 
-        if (0 === strpos(self::normalizeSeparators($components[0] ?? ''), DIRECTORY_SEPARATOR)) {
+        if (0 === mb_strpos(self::normalizeSeparators($components[0] ?? ''), DIRECTORY_SEPARATOR)) {
             array_unshift($normalized, DIRECTORY_SEPARATOR);
         }
 
         return array_values(array_filter(array_merge([
-            $normalized[0] ?? null
+            $normalized[0] ?? null,
         ], array_filter(array_slice($normalized, 1), function (string $v): bool {
             return DIRECTORY_SEPARATOR !== $v;
         }))));

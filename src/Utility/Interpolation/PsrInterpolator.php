@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of the `src-run/vermicious-console-io-library` project.
+ * This file is part of the `src-run/interface-query-console-app` project.
  *
  * (c) Rob Frawley 2nd <rmf@src.run>
  *

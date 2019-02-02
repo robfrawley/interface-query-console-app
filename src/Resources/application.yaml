@@ -1,16 +1,53 @@
+---
+
 application:
-  call: 'interface-query'
-  name: 'Interface Query'
-  desc: 'Retrieve requested data values for the specified wireless interfaces.'
-  version:
-    major: 0
-    minor: 1
-    patch: 0
-    extra: null
-  commands:
-    wireless:
-      name: 'wireless'
-      desc: 'Retrieve requested data values for the specified wireless interfaces'
-      interface:
-        type: 'wireless'
-        find: 'wl'
+    call: 'interface-query'
+    name: 'Interface Query'
+    desc: >-
+        Retrieves the specified ethernet or wireless interface device metrics, parsed the raw data, and ultimately
+        outputs a human- or machine-readable representation of the specifically requested data points per the CLI
+        options that were passed to this application.
+
+    version:
+        major: 0
+        minor: 1
+        patch: 0
+        extra: ~
+        named: 'partially-purged-appendage'
+
+    author:
+        name: 'Rob Frawley 2nd'
+        mail: 'rmf@src.run'
+        link: 'src.run/rmf'
+
+    license:
+        name: 'MIT License'
+        link: 'src-run.mit-license.org'
+
+    commands:
+
+        wireless:
+            call: 'wireless'
+            name: 'Wireless'
+            desc: >-
+                Retrieves the specified wireless interface(s) device metrics and outputs a human- or machine-readable
+                representation of the specifically requested data, per the CLI options that were passed to this command.
+
+            interface:
+                category: 'wireless'
+                validate:
+                    name_matches_type: '^wl.+'
+
+        ethernet:
+            call: 'ethernet'
+            name: 'ethernet'
+            desc: >-
+              Retrieves the specified ethernet interface(s) device metrics and outputs a human- or machine-readable
+              representation of the specifically requested data, per the CLI options that were passed to this command.
+
+            interface:
+                category: 'wireless'
+                validate:
+                    name_matches_type: '^wl.+'
+
+...

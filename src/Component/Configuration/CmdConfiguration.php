@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the `src-run/interface-query-console-app` project.
+ *
+ * (c) Rob Frawley 2nd <rmf@src.run>
+ *
+ * For the full copyright and license information, please view the LICENSE.md
+ * file that was distributed with this source code.
+ */
+
 namespace App\Component\Configuration;
 
 use Symfony\Component\Console\Command\Command;
@@ -9,12 +18,12 @@ final class CmdConfiguration extends Configuration
     /**
      * @var string[]
      */
-    protected const MAP_INTERFACE_TYPE = ['interface', 'type'];
+    protected const MAP_INTERFACE_TYPE = ['interface', 'category'];
 
     /**
      * @var string[]
      */
-    protected const MAP_INTERFACE_FIND = ['interface', 'find'];
+    protected const MAP_INTERFACE_FIND = ['interface', 'validate', 'name_matches_type'];
 
     /**
      * @param string $context
@@ -38,11 +47,11 @@ final class CmdConfiguration extends Configuration
     }
 
     /**
-     * @param int|null $default
+     * @param string|null $default
      *
      * @return string|null
      */
-    public function getInterfaceType(?int $default = 0): ?string
+    public function getInterfaceType(?string $default = null): ?string
     {
         return $this->getIfValidOrUseDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_INTERFACE_TYPE
@@ -58,11 +67,11 @@ final class CmdConfiguration extends Configuration
     }
 
     /**
-     * @param int|null $default
+     * @param string|null $default
      *
      * @return string|null
      */
-    public function getInterfaceFind(?int $default = 0): ?string
+    public function getInterfaceFind(?string $default = null): ?string
     {
         return $this->getIfValidOrUseDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_INTERFACE_FIND
@@ -76,7 +85,7 @@ final class CmdConfiguration extends Configuration
      */
     public static function resolveCommandContext(Command $command): string
     {
-        return strtolower(
+        return mb_strtolower(
             preg_replace('/(?<=\\w)(?=[A-Z])/', '-$1',
                 preg_replace('/Command$/', '', (new \ReflectionObject($command))->getShortName())
             )

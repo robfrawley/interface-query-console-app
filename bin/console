@@ -1,10 +1,25 @@
 #!/usr/bin/env php
 <?php
 
+/*
+ * This file is part of the `src-run/interface-query-console-app` project.
+ *
+ * (c) Rob Frawley 2nd <rmf@src.run>
+ *
+ * For the full copyright and license information, please view the LICENSE.md
+ * file that was distributed with this source code.
+ */
+
 require __DIR__.'/../vendor/autoload.php';
 
 use App\Application\Application;
+use App\Component\Configuration\AppConfiguration;
 use App\Component\DotEnv\DotEnv;
+use SR\Exception\Runtime\RuntimeException;
 
-(new DotEnv(__DIR__.'/../'))->load();
-(new Application())->run();
+try {
+    (new DotEnv(__DIR__.'/../'))->load();
+    (new Application())->run();
+} catch (\Exception $e) {
+    throw new RuntimeException('Failed to run console command application: "%s"', $e->getMessage(), $e);
+}

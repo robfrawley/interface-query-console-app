@@ -205,7 +205,7 @@ final class AppConfiguration extends Configuration
             $formats[] = ' (%s)';
         }
 
-        return vsprintf(implode($formats), $replace);
+        return vsprintf(implode('', $formats), $replace);
     }
 
     /**

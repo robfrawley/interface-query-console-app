@@ -11,9 +11,6 @@
 
 namespace App\Component\Configuration;
 
-use App\Utility\Reflection\ReflectionHelper;
-use Symfony\Component\Console\Command\Command;
-
 final class CmdConfiguration extends Configuration
 {
     /**

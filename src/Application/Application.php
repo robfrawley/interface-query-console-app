@@ -12,8 +12,8 @@
 namespace App\Application;
 
 use App\Command\AbstractCommand;
-use App\Command\ListDevicesCommand;
 use App\Command\EthernetDevicesCommand;
+use App\Command\ListDevicesCommand;
 use App\Command\WirelessDevicesCommand;
 use App\Command\WwanDevicesCommand;
 use App\Component\Configuration\AppConfiguration;
@@ -123,7 +123,7 @@ class Application extends SymfonyApplication
     private function getInfoTextVersionMarkup(): string
     {
         $data = [
-            sprintf('version <fg=white;options=bold>%s</>', $this->c()->stringifyVersion(null, true, false))
+            sprintf('version <fg=white;options=bold>%s</>', $this->c()->stringifyVersion(null, true, false)),
         ];
 
         $this->style->ifDebug(function () use (&$data) {
@@ -141,7 +141,7 @@ class Application extends SymfonyApplication
     private function getInfoTextAuthorMarkup(): ?string
     {
         $data = [
-            sprintf('authored by <fg=white;options=bold>%s</>', $this->c()->getAuthorName('Unspecified Author'))
+            sprintf('authored by <fg=white;options=bold>%s</>', $this->c()->getAuthorName('Unspecified Author')),
         ];
 
         $this->style->ifDebug(function () use (&$data) {

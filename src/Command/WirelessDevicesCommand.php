@@ -26,6 +26,7 @@ final class WirelessDevicesCommand extends AbstractCommand
     public function executeCommand(array $interfaces = []): int
     {
         dump($interfaces);
+
         return 0;
         $data = array_filter(array_map(function (string $name) use ($input) {
             return $this->getInterfaceData($name, $input);

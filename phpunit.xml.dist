@@ -11,7 +11,7 @@
          bootstrap="./vendor/autoload.php">
 
     <testsuites>
-        <testsuite name="src-run/vermicious-console-io-library">
+        <testsuite name="src-run/interface-query-console-app">
             <directory>tests</directory>
         </testsuite>
     </testsuites>

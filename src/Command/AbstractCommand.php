@@ -57,16 +57,6 @@ abstract class AbstractCommand extends Command
     protected const ARG_INTERFACE_NAME = 'interface-name';
 
     /**
-     * @var string
-     */
-    private static $sysFsNetRootPath = '/sys/class/net';
-
-    /**
-     * @var Style
-     */
-    private $style;
-
-    /**
      * @var CmdConfiguration
      */
     protected $configuration;
@@ -87,18 +77,14 @@ abstract class AbstractCommand extends Command
     protected $enableGeneralInputDefinition = true;
 
     /**
-     * Setup command name, description, and options/arguments definition.
+     * @var string
      */
-    protected function configure(): void
-    {
-        if (method_exists($this, 'configureCommand') && is_callable([$this, 'configureCommand'])) {
-            $this->configureCommand();
-        }
+    private static $sysFsNetRootPath = '/sys/class/net';
 
-        $this->setName($this->c()->getCall());
-        $this->setDescription($this->c()->getDesc());
-        $this->setDefinition($this->setupInputDefinition());
-    }
+    /**
+     * @var Style
+     */
+    private $style;
 
     /**
      * @param InputInterface|null  $i
@@ -167,6 +153,20 @@ abstract class AbstractCommand extends Command
                 )
             )
         );
+    }
+
+    /**
+     * Setup command name, description, and options/arguments definition.
+     */
+    protected function configure(): void
+    {
+        if (method_exists($this, 'configureCommand') && is_callable([$this, 'configureCommand'])) {
+            $this->configureCommand();
+        }
+
+        $this->setName($this->c()->getCall());
+        $this->setDescription($this->c()->getDesc());
+        $this->setDefinition($this->setupInputDefinition());
     }
 
     /**
@@ -373,9 +373,9 @@ abstract class AbstractCommand extends Command
     }
 
     /**
-     * @param string          $contextName
-     * @param \Closure|null   $contextFilter
-     * @param int             $default
+     * @param string        $contextName
+     * @param \Closure|null $contextFilter
+     * @param int           $default
      *
      * @return array
      * @return array
@@ -421,7 +421,7 @@ abstract class AbstractCommand extends Command
             $this->c()->getInterfaceType(), $default, $interfaces[$default]
         ), array_merge($interfaces, ['q' => 'Quit']), '0'))->setMultiselect(true));
 
-        if (in_array('q', $provided)) {
+        if (in_array('q', $provided, true)) {
             $this->s()->warning('Halting script execution due to user requested termination.');
             exit(255);
         }

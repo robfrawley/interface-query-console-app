@@ -1,25 +1,25 @@
 
-# [src-run] vermicious-console-io-library
+# [src-run] interface-query-console-app
 
 |       Travis-CI        |      Codacy Rating      |      Code Coverage      |        Style-CI         |         Release         |    API Documentation    |
 |:----------------------:|:-----------------------:|:-----------------------:|:-----------------------:|:-----------------------:|:-----------------------:|
-| [![Travis](https://src.run/vermicious-console-io-library/travis.svg)](https://src.run/vermicious-console-io-library/travis) | [![Codacy](https://src.run/vermicious-console-io-library/codacy.svg)](https://src.run/vermicious-console-io-library/codacy) | [![Coveralls](https://src.run/vermicious-console-io-library/coveralls.svg)](https://src.run/vermicious-console-io-library/coveralls) | [![Coveralls](https://src.run/vermicious-console-io-library/styleci.svg)](https://src.run/vermicious-console-io-library/styleci) | [![Packagist](https://src.run/vermicious-console-io-library/packagist.svg)](https://src.run/vermicious-console-io-library/packagist) | [![API Docs](https://src.run/vermicious-console-io-library/api.svg)](https://src.run/vermicious-console-io-library/api) |
+| [![Travis](https://src.run/interface-query-console-app/travis.svg)](https://src.run/interface-query-console-app/travis) | [![Codacy](https://src.run/interface-query-console-app/codacy.svg)](https://src.run/interface-query-console-app/codacy) | [![Coveralls](https://src.run/interface-query-console-app/coveralls.svg)](https://src.run/interface-query-console-app/coveralls) | [![Coveralls](https://src.run/interface-query-console-app/styleci.svg)](https://src.run/interface-query-console-app/styleci) | [![Packagist](https://src.run/interface-query-console-app/packagist.svg)](https://src.run/interface-query-console-app/packagist) | [![API Docs](https://src.run/interface-query-console-app/api.svg)](https://src.run/interface-query-console-app/api) |
 
 
 ## Overview
 
 [Welcome](https://src.run/go/readme_welcome)!
-The `src-run/vermicious-console-io-library` package provides the following
+The `src-run/interface-query-console-app` package provides the following
 
 > Enhanced console input/output style implementation with a complete object-oriented API.
 
 ### Grouping
 
 We use a Willy Wonka-inspired naming schema for our package group names. This package is part of the
-[augustus group](https://src.run/vermicious-console-io-library/group), which is a collection of packages with a focus
+[augustus group](https://src.run/interface-query-console-app/group), which is a collection of packages with a focus
 on "core reflection base classes" and related functionality.
 
-You are welcome to research some [useless details](https://src.run/vermicious-console-io-library/group_explanation)
+You are welcome to research some [useless details](https://src.run/interface-query-console-app/group_explanation)
 about this specific group if you have too much time on your hands.
 
 ### JTT
@@ -29,7 +29,7 @@ released under the "SR" namespace, comprised of many framework-agnostic librarie
 well as some one-off releases. This project is authored and maintained by:
 
 - [Rob Frawley 2nd](https://src.run/rmf)
-- [Collaborators](https://src.run/vermicious-console-io-library/github_collaborators)
+- [Collaborators](https://src.run/interface-query-console-app/github_collaborators)
 
 
 ## Quick Start
@@ -41,14 +41,14 @@ Get the code by requiring it explicitly via the [Composer](https://getcomposer.c
 this project using the CLI, use the following command.
 
 ```bash
-$ composer require src-run/vermicious-console-io-library
+$ composer require src-run/interface-query-console-app
 ```
 
 Alternatively, to add this project to your "composer.json" file, add the following to the "require" section.
 
 ```json
 require: {
-	"src-run/vermicious-console-io-library": "dev-master"
+	"src-run/interface-query-console-app": "dev-master"
 }
 ```
 
@@ -90,7 +90,7 @@ discuss language-level ideas, possible new directions for a project, emerging te
 
 ### Issues
 
-To report issues or request a new feature, use the [project issue tracker](https://src.run/vermicious-console-io-library/github_issues).
+To report issues or request a new feature, use the [project issue tracker](https://src.run/interface-query-console-app/github_issues).
 Include as much information as possible in any bug reports. Feel free to "ping" the topic if you don't get a response
 within a few days (sometimes Github notification e-mails fall through the cracks).
 
@@ -98,14 +98,14 @@ within a few days (sometimes Github notification e-mails fall through the cracks
 
 You created additional functionality while utilizing this package? Wonderful: send it back upstream! *Don't hesitate to
 submit a pull request!* Your [imagination](https://src.run/go/readme_imagination) and the requirements outlined within
-our [CONTRIBUTING.md](https://src.run/vermicious-console-io-library/contributing) file are the only limitations.
+our [CONTRIBUTING.md](https://src.run/interface-query-console-app/contributing) file are the only limitations.
 
 
 ## License
 
 This project is licensed under the [MIT License](https://src.run/go/mit), an [FSF](https://src.run/go/fsf)- and 
 [OSI](https://src.run/go/osi)-approved, [GPL](https://src.run/go/gpl)-compatible, permissive free software license.
-Review the [LICENSE](https://src.run/vermicious-console-io-library/license) file distributed with this source code for additional
+Review the [LICENSE](https://src.run/interface-query-console-app/license) file distributed with this source code for additional
 information.
 
 
@@ -113,7 +113,7 @@ information.
 
 | Item               | Result/Status                                                                                                      |
 |-------------------:|:-------------------------------------------------------------------------------------------------------------------|
-| __Stable Release__ | [![Packagist](https://src.run/vermicious-console-io-library/packagist.svg)](https://src.run/vermicious-console-io-library/packagist)     |
-| __Dev Release__    | [![Packagist](https://src.run/vermicious-console-io-library/packagist_pre.svg)](https://src.run/vermicious-console-io-library/packagist) |
-| __License__        | [![License](https://src.run/vermicious-console-io-library/license.svg)](https://src.run/vermicious-console-io-library/license)           |
+| __Stable Release__ | [![Packagist](https://src.run/interface-query-console-app/packagist.svg)](https://src.run/interface-query-console-app/packagist)     |
+| __Dev Release__    | [![Packagist](https://src.run/interface-query-console-app/packagist_pre.svg)](https://src.run/interface-query-console-app/packagist) |
+| __License__        | [![License](https://src.run/interface-query-console-app/license.svg)](https://src.run/interface-query-console-app/license)           |
 

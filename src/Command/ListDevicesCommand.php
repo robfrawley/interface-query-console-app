@@ -15,13 +15,6 @@ use Symfony\Component\Console\Input\InputDefinition;
 
 final class ListDevicesCommand extends AbstractCommand
 {
-    protected function configureCommand(): void
-    {
-        $this->enableInteractSanityChecks =
-            $this->enableExecuteSanityChecks =
-                $this->enableGeneralInputDefinition = false;
-    }
-
     /**
      * @param array $interfaces
      *
@@ -30,6 +23,13 @@ final class ListDevicesCommand extends AbstractCommand
     public function executeCommand(array $interfaces = []): int
     {
         return 255;
+    }
+
+    protected function configureCommand(): void
+    {
+        $this->enableInteractSanityChecks =
+            $this->enableExecuteSanityChecks =
+                $this->enableGeneralInputDefinition = false;
     }
 
     /**

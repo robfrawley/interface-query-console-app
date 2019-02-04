@@ -11,51 +11,19 @@
 
 namespace App\Command;
 
-use App\Component\Configuration\AppConfiguration;
-use App\System\Device\Wireless\WirelessDevice;
 use Symfony\Component\Console\Input\InputDefinition;
-use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\OutputInterface;
 
-final class WirelessCommand extends AbstractCommand
+final class WwanDevicesCommand extends AbstractCommand
 {
     /**
-     * @param array           $interfaces
-     * @param InputInterface  $input
-     * @param OutputInterface $output
+     * @param array $interfaces
      *
      * @return int
      */
-    public function executeCommand(array $interfaces, InputInterface $input, OutputInterface $output): int
+    public function executeCommand(array $interfaces = []): int
     {
-        dump($interfaces);
-        return 0;
-        $data = array_filter(array_map(function (string $name) use ($input) {
-            return $this->getInterfaceData($name, $input);
-        }, $interfaces));
-
-        dump($data);
-
-        return 0;
-    }
-
-    /**
-     * @param string         $name
-     * @param InputInterface $input
-     *
-     * @return array|null
-     */
-    protected function getInterfaceData(string $name, InputInterface $input): ?array
-    {
-        $dev = new WirelessDevice($name);
-        $row = [];
-
-        if ($input->hasOption('signal-dbm')) {
-            $row[] = $this->extractSignalLevel($raw);
-        }
-
-        return $row;
+        return 255;
     }
 
     /**
@@ -72,10 +40,6 @@ final class WirelessCommand extends AbstractCommand
         $definition->addOption(
             new InputOption(self::OPT_MODE_DESC, ['M'], InputOption::VALUE_NONE,
                 'Concise description of the interface operational mode.')
-        );
-        $definition->addOption(
-            new InputOption(self::OPT_ESSID, ['e'], InputOption::VALUE_NONE,
-                'Extended service set identifier (ESSID) or service set identifier (SSID).')
         );
         $definition->addOption(
             new InputOption(self::OPT_SIGNAL_DBM, ['l'], InputOption::VALUE_NONE,

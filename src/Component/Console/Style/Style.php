@@ -12,21 +12,19 @@
 namespace App\Component\Console\Style;
 
 use App\Command\AbstractCommand;
+use App\Utility\Reflection\ReflectionHelper;
+use Symfony\Component\Console\Helper\Helper;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 class Style extends SymfonyStyle
 {
     /**
-     * @var InputInterface
-     */
-    private $originalI;
-
-    /**
      * @var OutputInterface
      */
-    private $originalO;
+    private $unbufferedOutput;
 
     /**
      * @param InputInterface  $input
@@ -34,9 +32,9 @@ class Style extends SymfonyStyle
      */
     public function __construct(InputInterface $input, OutputInterface $output)
     {
-        $this->originalI = $input;
-        $this->originalO = $output;
         parent::__construct($input, $output);
+
+        $this->unbufferedOutput = $output;
     }
 
     /**
@@ -44,15 +42,23 @@ class Style extends SymfonyStyle
      */
     public function getInput(): InputInterface
     {
-        return $this->originalI;
+        return ReflectionHelper::propertyValue($this, 'input');
+    }
+
+    /**
+     * @return OutputInterface|BufferedOutput
+     */
+    public function getOutput(): OutputInterface
+    {
+        return ReflectionHelper::propertyValue($this, 'bufferedOutput');
     }
 
     /**
      * @return OutputInterface
      */
-    public function getOutput(): OutputInterface
+    public function getUnbufferedOutput(): OutputInterface
     {
-        return $this->originalO;
+        return $this->unbufferedOutput;
     }
 
     /**
@@ -140,15 +146,97 @@ class Style extends SymfonyStyle
      */
     public function applicationTitle(AbstractCommand $command)
     {
-        try {
-            $prependBlock = (new \ReflectionObject($this))->getMethod('autoPrependBlock');
-            $prependBlock->setAccessible(true);
-        } catch (\ReflectionException $e) {
-            throw new \RuntimeException('Failed to resolve "autoPrependBlock" private parent method.');
-        }
-
-        $prependBlock->invoke($this);
-        $this->writeln(preg_replace(sprintf('/(%s)/', preg_quote($command->getApplication()->c()->getName())), sprintf('%s $1', $command->c()->getName()), $command->getApplication()->getLongVersion()));
+        $this->prependBlock();
+        $this->writeln($this->makeBoxedText(preg_replace(
+            sprintf('/\s?(%s)/', preg_quote($command->getApplication()->c()->getName())),
+            sprintf('$1 (%s)', $command->c()->getName()),
+            $command->getApplication()->getLongVersion()
+        )));
         $this->newLine();
+    }
+
+    /**
+     * @return self
+     */
+    public function prependBlock(): self
+    {
+        ReflectionHelper::methodInvoke($this, 'autoPrependBlock');
+
+        return $this;
+    }
+
+    /**
+     * @return self
+     */
+    public function prependText(): self
+    {
+        ReflectionHelper::methodInvoke($this, 'autoPrependText');
+
+        return $this;
+    }
+
+    /**
+     * @param string $text
+     * @param bool   $thick
+     * @param bool   $trimText
+     *
+     * @return string[]
+     */
+    public function makeBoxedText(string $text, bool $thick = false, bool $trimText = true): array
+    {
+        $size = $this->stringLength($text);
+
+        return [
+            sprintf(' %s', $this->makeDarkGray($this->makeLine(
+                $size + 3, $thick ? '┏' : '┌', $thick ? '┓' : '┐', $thick ? '━' : '─'
+            ))),
+            sprintf(
+                ' %s %s %1$s', $this->makeDarkGray($thick ? '┃' : '│'), $trimText ? trim($text) : $text
+            ),
+            sprintf(' %s', $this->makeDarkGray($this->makeLine(
+                $size + 3, $thick ? '┗' : '└', $thick ? '┛' : '┘', $thick ? '━' : '─'
+            ))),
+        ];
+    }
+
+    /**
+     * @param string $text
+     *
+     * @return string
+     */
+    public function makeDarkGray(string $text): string
+    {
+        return sprintf('<fg=black;options=bold>%s</>', $text);
+    }
+
+    /**
+     * @param int         $size
+     * @param string|null $leftChar
+     * @param string|null $rightChar
+     * @param string|null $lineChar
+     * @param string      $defaultChar
+     *
+     * @return string
+     */
+    public function makeLine(int $size, string $leftChar = null, string $rightChar = null, string $lineChar = null, string $defaultChar = '─'): string
+    {
+        return vsprintf('%s%s%s', [
+            $leftChar ?? $defaultChar,
+            str_repeat($lineChar ?? $defaultChar, $size - 2),
+            $rightChar ?? $defaultChar,
+        ]);
+    }
+
+    /**
+     * @param string $text
+     * @param bool   $countMarkup
+     *
+     * @return int
+     */
+    public function stringLength(string $text, bool $countMarkup = false): int
+    {
+        return $countMarkup
+            ? Helper::strlen($text)
+            : Helper::strlenWithoutDecoration($this->getFormatter(), $text);
     }
 }

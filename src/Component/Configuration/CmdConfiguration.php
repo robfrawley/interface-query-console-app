@@ -11,10 +11,16 @@
 
 namespace App\Component\Configuration;
 
+use App\Utility\Reflection\ReflectionHelper;
 use Symfony\Component\Console\Command\Command;
 
 final class CmdConfiguration extends Configuration
 {
+    /**
+     * @var string[]
+     */
+    protected const MAP_LOAD = ['load'];
+
     /**
      * @var string[]
      */
@@ -26,16 +32,23 @@ final class CmdConfiguration extends Configuration
     protected const MAP_INTERFACE_FIND = ['interface', 'validate', 'name_matches_type'];
 
     /**
-     * @param string $context
+     * @return bool
      */
-    public function __construct(string $context)
+    public function hasLoad(): bool
     {
-        parent::__construct(
-            ...self::LOCATION_APP_CONFIG
-        );
+        return null !== $this->getLoad(null);
+    }
 
-        $this->load();
-        $this->setNamespace('application', 'commands', $context);
+    /**
+     * @param bool $default
+     *
+     * @return bool
+     */
+    public function getLoad(bool $default = false): bool
+    {
+        return $this->getValidOrDefault(
+            self::useBooleanTypeChecker(), $default, ...self::MAP_LOAD
+        );
     }
 
     /**
@@ -43,7 +56,7 @@ final class CmdConfiguration extends Configuration
      */
     public function hasInterfaceType(): bool
     {
-        return $this->has(...self::MAP_INTERFACE_TYPE);
+        return null !== $this->getInterfaceType(null);
     }
 
     /**
@@ -53,7 +66,7 @@ final class CmdConfiguration extends Configuration
      */
     public function getInterfaceType(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_INTERFACE_TYPE
         );
     }
@@ -63,7 +76,7 @@ final class CmdConfiguration extends Configuration
      */
     public function hasInterfaceFind(): bool
     {
-        return $this->has(...self::MAP_INTERFACE_FIND);
+        return null !== $this->getInterfaceFind(null);
     }
 
     /**
@@ -73,22 +86,22 @@ final class CmdConfiguration extends Configuration
      */
     public function getInterfaceFind(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_INTERFACE_FIND
         );
     }
 
     /**
-     * @param Command $command
+     * @param string ...$namespace
      *
-     * @return string
+     * @return string[]
      */
-    public static function resolveCommandContext(Command $command): string
+    protected function resolveNamespace(string ...$namespace): array
     {
-        return mb_strtolower(
-            preg_replace('/(?<=\\w)(?=[A-Z])/', '-$1',
-                preg_replace('/Command$/', '', (new \ReflectionObject($command))->getShortName())
-            )
-        );
+        if (1 === count($namespace)) {
+            array_unshift($namespace, 'application', 'commands');
+        }
+
+        return $namespace;
     }
 }

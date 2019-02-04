@@ -11,12 +11,14 @@
 
 namespace App\Component\Configuration;
 
+use App\Component\Configuration\Exception\CacheException;
 use App\Component\Configuration\Exception\IOException;
 use App\Component\Configuration\Exception\LoadException;
 use App\Component\Configuration\Exception\ParseException;
 use App\Component\Filesystem\Path;
 use App\Utility\Interpolation\PsrInterpolator;
 use Ramsey\Uuid\Uuid;
+use SR\Exception\Logic\InvalidArgumentException;
 use SR\Utilities\Interpreter\Interpreter;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
@@ -24,10 +26,14 @@ use Symfony\Component\Yaml\Yaml;
 abstract class Configuration
 {
     /**
+     * @var string
+     */
+    protected const LOCATION_CONFIG_FILE = 'application.yaml';
+
+    /**
      * @var string[]
      */
-    protected const LOCATION_APP_CONFIG = [
-        'application.yaml',
+    protected const LOCATION_CONFIG_DIRS = [
         '{self.conf}',
     ];
 
@@ -51,6 +57,11 @@ abstract class Configuration
     protected const MAP_DESC = [
         'desc',
     ];
+
+    /**
+     * @var array[]
+     */
+    private static $cachedConfigs = [];
 
     /**
      * @var string[]
@@ -79,25 +90,21 @@ abstract class Configuration
 
     /**
      * @param string|null $file
-     * @param string      ...$roots
+     * @param array|null  $roots
+     * @param string      ...$namespace
      */
-    public function __construct(string $file = null, string ...$roots)
+    public function __construct(string $file = null, array $roots = null, string ...$namespace)
     {
-        $this->addSearchFile($file);
+        $this->addSearchFile(
+            $file ?? self::LOCATION_CONFIG_FILE
+        );
 
-        foreach ($roots as $path) {
+        foreach ($roots ?? self::LOCATION_CONFIG_DIRS as $path) {
             $this->addSearchRoot($path);
         }
-    }
 
-    /**
-     * @param string $name
-     *
-     * @return mixed|null
-     */
-    public function __get(string $name)
-    {
-        return $this->data[$name] ?? null;
+        $this->setNamespace(...self::prepareNamespace(...$namespace));
+        $this->load();
     }
 
     /**
@@ -147,9 +154,9 @@ abstract class Configuration
      *
      * @return string|null
      */
-    public function getCall(?string $default = 'undefined-application-calling-name'): ?string
+    public function getCall(?string $default = 'undefined'): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_CALL
         );
     }
@@ -167,9 +174,9 @@ abstract class Configuration
      *
      * @return string|null
      */
-    public function getName(?string $default = 'Undefined Application Display Name'): ?string
+    public function getName(?string $default = 'Undefined'): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_NAME
         );
     }
@@ -187,9 +194,9 @@ abstract class Configuration
      *
      * @return string|null
      */
-    public function getDesc(?string $default = 'Undefined Application Desc'): ?string
+    public function getDesc(?string $default = 'Undefined'): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_DESC
         );
     }
@@ -231,14 +238,6 @@ abstract class Configuration
     }
 
     /**
-     * @return mixed[]
-     */
-    public function getData(): array
-    {
-        return $this->data;
-    }
-
-    /**
      * @param string ...$indices
      *
      * @return bool
@@ -265,26 +264,17 @@ abstract class Configuration
     }
 
     /**
-     * @param callable|null $checker
-     * @param string        ...$indices
-     *
-     * @return mixed|null
-     */
-    public function getIfValidOrUseNullVal(callable $checker = null, string ...$indices)
-    {
-        return $this->getIfValidOrUseDefault($checker, null, ...$indices);
-    }
-
-    /**
-     * @param callable|null $checker
+     * @param callable|null $validator
      * @param null          $default
      * @param string        ...$indices
      *
      * @return mixed|null
      */
-    public function getIfValidOrUseDefault(callable $checker = null, $default = null, string ...$indices)
+    public function getValidOrDefault(callable $validator = null, $default = null, string ...$indices)
     {
-        return ($checker ?? self::getDefaultValidator())($v = $this->get(...$indices)) ? $v : $default;
+        return ($validator ?? self::getDefaultValidator())(
+            $v = $this->get(...$indices)
+        ) ? $v : $default;
     }
 
     /**
@@ -294,7 +284,7 @@ abstract class Configuration
     {
         foreach ($this->roots as $root) {
             foreach ($this->files as $file) {
-                if ($this->data = $this->loadFile(($this->path = new Path($root, $file))->resolve()->build())) {
+                if ($this->data = $this->loadConfig(($this->path = self::createPath($root, $file))->resolve()->build())) {
                     break 2;
                 }
             }
@@ -336,10 +326,10 @@ abstract class Configuration
     /**
      * @return \Closure
      */
-    private static function getDefaultValidator(): \Closure
+    protected static function useBooleanTypeChecker(): \Closure
     {
         return function ($value): bool {
-            return !empty($value);
+            return is_bool($value);
         };
     }
 
@@ -358,47 +348,162 @@ abstract class Configuration
     }
 
     /**
+     * @param string ...$namespace
+     *
+     * @return string[]
+     */
+    private function prepareNamespace(string ...$namespace): array
+    {
+        $callable = [$this, 'resolveNamespace'];
+
+        if (method_exists(...$callable) && is_callable($callable)) {
+            $namespace = call_user_func($callable, ...$namespace);
+        }
+
+        if (empty($namespace)) {
+            throw new InvalidArgumentException(
+                'Required namespace context not provided during construction.'
+            );
+        }
+
+        return $namespace;
+    }
+
+    /**
      * @param string $path
      *
      * @return array|null
      */
-    private function loadFile(string $path): ?array
+    private function loadConfig(string $path): ?array
     {
-        if (!file_exists($path) || !is_readable($path)) {
-            return null;
-        }
-
         try {
-            return $this->readFileAndParseYaml($path);
-        } catch (\Exception $exception) {
-            throw new LoadException('Failed to load configuration file: "%s" (%s)', [
-                $path, $exception->getMessage(),
-            ], $exception);
+            return self::loadConfigAsCache($path) ?? self::saveConfigToCache(
+                $path,
+                $this->loadConfigParsedAsYAML(
+                    $this->readConfigFileContents($path), $path
+                )
+            );
+        } catch (\Exception $e) {
+            throw new LoadException(
+                'Failed to load config file: "%s" (%s)', [$path, $e->getMessage()], $e
+            );
         }
     }
 
     /**
      * @param string $path
      *
-     * @return array
+     * @return string|null
      */
-    private function readFileAndParseYaml(string $path): array
+    private function readConfigFileContents(string $path): ?string
     {
-        if (false === $content = @file_get_contents($path)) {
-            throw new IOException('Failed to read file contents: "%s" (%s)', [
-                $path, Interpreter::error(),
+        if ((true !== $exists = file_exists($path)) || (true !== is_readable($path))) {
+            throw new IOException('Failed to locate file: "%s" (%s)', [
+                $path, (false === $exists ? 'file does not exist' : 'file is not readable'),
             ]);
         }
 
-        try {
-            return Yaml::parse(
-                $content, Yaml::PARSE_CONSTANT | Yaml::PARSE_DATETIME | Yaml::PARSE_OBJECT
+        if (false === $content = @file_get_contents($path)) {
+            throw new IOException(
+                'Failed to get file contents: "%s" (%s)', [$path, Interpreter::error()]
             );
-        } catch (ParseException $exception) {
-            throw new ParseException('Failed to parse file YAML: "%s" (%s)', [
-                $path, $exception->getMessage(),
-            ], $exception);
         }
+
+        return $content;
+    }
+
+    /**
+     * @param string $text
+     * @param string $path
+     *
+     * @return array
+     */
+    private function loadConfigParsedAsYAML(string $text, string $path): array
+    {
+        try {
+            $config = Yaml::parse(
+                $text, Yaml::PARSE_CONSTANT | Yaml::PARSE_DATETIME | Yaml::PARSE_OBJECT
+            );
+        } catch (ParseException $e) {
+            throw new ParseException(
+                'Failed to parse file: "%s" (%s)', [$path, $e->getMessage()], $e
+            );
+        }
+
+        if (empty($config)) {
+            throw new ParseException(
+                'Failed to load config file: "%s" (parsed file to empty array)', [$path]
+            );
+        }
+
+        return $config;
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return array|null
+     */
+    private static function loadConfigAsCache(string $path): ?array
+    {
+        return self::$cachedConfigs[self::makeConfigCacheKey($path)] ?? null;
+    }
+
+    /**
+     * @param string     $path
+     * @param array|null $config
+     *
+     * @return array|null
+     */
+    private static function saveConfigToCache(string $path, ?array $config = []): ?array
+    {
+        return self::$cachedConfigs[self::makeConfigCacheKey($path)] = $config;
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return string
+     */
+    private static function makeConfigCacheKey(string $path): string
+    {
+        static $algorithm;
+
+        return hash($algorithm ?? $algorithm = self::decideBestAvailHashAlgo(), $path);
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return string
+     */
+    private static function decideBestAvailHashAlgo(): string
+    {
+        $algos = ['sha3-512', 'sha3-256', 'sha512', 'sha512/256', 'sha256', 'sha1', 'md5'];
+        $found = array_filter($algos, function (string $name): bool {
+            return in_array($name, hash_algos(), true);
+        });
+
+        if (empty($found)) {
+            throw new CacheException(
+                'Failed to decide best available hash algorithm of: %s (none supported by host system).',
+                self::implodeQuotedList($algos)
+            );
+        }
+
+        return array_shift($found);
+    }
+
+    /**
+     * @param array $list
+     *
+     * @return string
+     */
+    private static function implodeQuotedList(array $list): string
+    {
+        return implode(', ', array_map(function (string $name): string {
+            return sprintf('"%s"', $name);
+        }, $list));
     }
 
     /**
@@ -443,7 +548,7 @@ abstract class Configuration
         $process->run();
 
         return 0 === $process->getExitCode()
-            ? (new Path(trim($process->getOutput())))->buildResolved()
+            ? self::createPath(trim($process->getOutput()))->buildResolved()
             : '';
     }
 
@@ -456,7 +561,7 @@ abstract class Configuration
             $last = $path ?? __DIR__;
 
             if (false !== realpath(implode(DIRECTORY_SEPARATOR, [$path ?? $last, 'vendor', '..', 'composer.json']))) {
-                return (new Path($path ?? $last))->buildResolved();
+                return self::createPath($path ?? $last)->buildResolved();
             }
         } while ($last !== $path = dirname($last));
 
@@ -468,7 +573,7 @@ abstract class Configuration
      */
     private static function locateSelfConfPath(): ?string
     {
-        return (new Path(self::locateSelfRootPath(), 'src', 'Resources'))->buildResolved();
+        return self::createPath(self::locateSelfRootPath(), 'src', 'Resources')->buildResolved();
     }
 
     /**
@@ -477,15 +582,15 @@ abstract class Configuration
     private static function locateUserHomePath(): string
     {
         if (false !== $home = getenv('HOME')) {
-            return (new Path($home))->buildResolved();
+            return self::createPath($home)->buildResolved();
         }
 
         if (false !== $home = (posix_getpwuid(posix_geteuid())['dir'] ?? false)) {
-            return (new Path($home))->buildResolved();
+            return self::createPath($home)->buildResolved();
         }
 
         if (false !== $name = (posix_getpwuid(posix_geteuid())['name'] ?? false)) {
-            return (new Path('/home', $name))->buildResolved();
+            return self::createPath('/home', $name)->buildResolved();
         }
 
         return '';
@@ -496,9 +601,7 @@ abstract class Configuration
      */
     private static function locateUserConfPath(): string
     {
-        return (new Path(
-            self::locateUserHomePath(), '.config', 'interface-query'
-        ))->buildResolved();
+        return self::createPath(self::locateUserHomePath(), '.config', 'interface-query')->buildResolved();
     }
 
     /**
@@ -506,7 +609,7 @@ abstract class Configuration
      */
     private static function locateHostConfPath(): string
     {
-        return (new Path('/etc'))->buildResolved();
+        return self::createPath('/etc')->buildResolved();
     }
 
     /**
@@ -517,5 +620,15 @@ abstract class Configuration
     private static function createPath(string ...$components): Path
     {
         return new Path(...$components);
+    }
+
+    /**
+     * @return \Closure
+     */
+    private static function getDefaultValidator(): \Closure
+    {
+        return function ($value): bool {
+            return !empty($value);
+        };
     }
 }

@@ -11,15 +11,30 @@
 
 namespace App\Application;
 
-use App\Command\WirelessCommand;
+use App\Command\AbstractCommand;
+use App\Command\ListDevicesCommand;
+use App\Command\EthernetDevicesCommand;
+use App\Command\WirelessDevicesCommand;
+use App\Command\WwanDevicesCommand;
 use App\Component\Configuration\AppConfiguration;
 use App\Component\Console\Style\Style;
 use Symfony\Component\Console\Application as SymfonyApplication;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class Application extends SymfonyApplication
 {
+    /**
+     * @var string[]
+     */
+    private static $commandClasses = [
+        ListDevicesCommand::class,
+        EthernetDevicesCommand::class,
+        WirelessDevicesCommand::class,
+        WwanDevicesCommand::class,
+    ];
+
     /**
      * @var AppConfiguration
      */
@@ -30,6 +45,10 @@ class Application extends SymfonyApplication
      */
     private $style;
 
+    /**
+     * Application constructor provides parent name and version string from app configuration and auto-registers enabled
+     * commands using cmd configuration.
+     */
     public function __construct()
     {
         parent::__construct(
@@ -37,7 +56,7 @@ class Application extends SymfonyApplication
             $this->c()->stringifyVersion()
         );
 
-        $this->add(new WirelessCommand());
+        $this->addCommands(self::instantiateCommands());
     }
 
     /**
@@ -76,6 +95,18 @@ class Application extends SymfonyApplication
             $this->getInfoTextAuthorMarkup(),
             $this->getInfoTextLicenseMarkup(),
         ]);
+    }
+
+    /**
+     * @return AbstractCommand[]
+     */
+    private static function instantiateCommands(): array
+    {
+        return array_filter(array_map(function (string $object): Command {
+            return new $object();
+        }, self::$commandClasses), function (Command $command): bool {
+            return $command instanceof AbstractCommand;
+        });
     }
 
     /**

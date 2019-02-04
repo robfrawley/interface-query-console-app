@@ -84,19 +84,6 @@ final class AppConfiguration extends Configuration
     ];
 
     /**
-     * @param string|null $context
-     */
-    public function __construct(string $context = null)
-    {
-        parent::__construct(
-            ...self::LOCATION_APP_CONFIG
-        );
-
-        $this->load();
-        $this->setNamespace($context ?? 'application');
-    }
-
-    /**
      * @return bool
      */
     public function hasVersionMajor(): bool
@@ -111,7 +98,7 @@ final class AppConfiguration extends Configuration
      */
     public function getVersionMajor(?int $default = 0): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::usePositiveIntegerChecker(), $default, ...self::MAP_VERSION_MAJOR
         );
     }
@@ -131,7 +118,7 @@ final class AppConfiguration extends Configuration
      */
     public function getVersionMinor(?int $default = 0): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::usePositiveIntegerChecker(), $default, ...self::MAP_VERSION_MINOR
         );
     }
@@ -151,7 +138,7 @@ final class AppConfiguration extends Configuration
      */
     public function getVersionPatch(?int $default = 0): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::usePositiveIntegerChecker(), $default, ...self::MAP_VERSION_PATCH
         );
     }
@@ -171,7 +158,7 @@ final class AppConfiguration extends Configuration
      */
     public function getVersionExtra(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_VERSION_EXTRA
         );
     }
@@ -191,7 +178,7 @@ final class AppConfiguration extends Configuration
      */
     public function getVersionNamed(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_VERSION_NAMED
         );
     }
@@ -236,7 +223,7 @@ final class AppConfiguration extends Configuration
      */
     public function getAuthorName(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_AUTHOR_NAME
         );
     }
@@ -256,7 +243,7 @@ final class AppConfiguration extends Configuration
      */
     public function getAuthorMail(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_AUTHOR_MAIL
         );
     }
@@ -276,7 +263,7 @@ final class AppConfiguration extends Configuration
      */
     public function getAuthorLink(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_AUTHOR_LINK
         );
     }
@@ -310,7 +297,7 @@ final class AppConfiguration extends Configuration
      */
     public function getLicenseName(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_LICENSE_NAME
         );
     }
@@ -330,7 +317,7 @@ final class AppConfiguration extends Configuration
      */
     public function getLicenseLink(?string $default = null): ?string
     {
-        return $this->getIfValidOrUseDefault(
+        return $this->getValidOrDefault(
             self::useNonEmptyScalarChecker(), $default, ...self::MAP_LICENSE_LINK
         );
     }
@@ -346,5 +333,15 @@ final class AppConfiguration extends Configuration
             $this->getLicenseName(),
             $this->getLicenseLink(),
         ]);
+    }
+
+    /**
+     * @param string ...$namespace
+     *
+     * @return string[]
+     */
+    protected function resolveNamespace(string ...$namespace): array
+    {
+        return empty($namespace) ? ['application'] : $namespace;
     }
 }

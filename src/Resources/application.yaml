@@ -26,28 +26,57 @@ application:
 
     commands:
 
-        wireless:
-            call: 'wireless'
-            name: 'Wireless'
-            desc: >-
-                Retrieves the specified wireless interface(s) device metrics and outputs a human- or machine-readable
-                representation of the specifically requested data, per the CLI options that were passed to this command.
+      wireless:
+        load: true
+        call: 'iq:wlan'
+        name: 'Wireless'
+        desc: >-
+          Retrieves the specified wireless interface(s) device metrics and outputs a human- or machine-readable
+          representation of the specifically requested data, per the CLI options that were passed to this command.
 
-            interface:
-                category: 'wireless'
-                validate:
-                    name_matches_type: '^wl.+'
+        interface:
+          category: 'wireless'
+          validate:
+            name_matches_type: '^(wlp[a-z0-9]+|wlan[a-z0-9]+)$'
 
-        ethernet:
-            call: 'ethernet'
-            name: 'ethernet'
-            desc: >-
-              Retrieves the specified ethernet interface(s) device metrics and outputs a human- or machine-readable
-              representation of the specifically requested data, per the CLI options that were passed to this command.
+      ethernet:
+        load: false
+        call: 'iq:elan'
+        name: 'Ethernet'
+        desc: >-
+          Retrieves the specified ethernet interface(s) device metrics and outputs a human- or machine-readable
+          representation of the specifically requested data, per the CLI options that were passed to this command.
 
-            interface:
-                category: 'wireless'
-                validate:
-                    name_matches_type: '^wl.+'
+        interface:
+          category: 'ethernet'
+          validate:
+            name_matches_type: '^(enp[a-z0-9]+|eth[a-z0-9]+)$'
+
+      wwan:
+        load: false
+        call: 'iq:wwan'
+        name: 'Wireless WAN'
+        desc: >-
+          Retrieves the specified wireless WAN interface(s) device metrics and outputs a human- or machine-readable
+          representation of the specifically requested data, per the CLI options that were passed to this command.
+
+        interface:
+          category: 'ethernet'
+          validate:
+            name_matches_type: '^(wwp[a-z0-9]+)$'
+
+      list:
+        load: true
+        call: 'iq:list'
+        name: 'List'
+        desc: >-
+          Searches the local host system for recognized network interface(s), either wireless devices, wireless
+          wide area network (WWAN) devices, ethernet devices, or both, and outputs the listing using either a
+          human- or machine-readable representation, per the CLI options that were passed to this command.
+
+        interface:
+          category: 'listing'
+          validate:
+            name_matches_type: '^(wlp[a-z0-9]+|wlan[a-z0-9]+|enp[a-z0-9]+|eth[a-z0-9]+|wwp[a-z0-9]+)$'
 
 ...

@@ -12,11 +12,10 @@
 namespace App\Command;
 
 use App\Application\Application;
-use App\Component\Configuration\AppConfiguration;
 use App\Component\Configuration\CmdConfiguration;
 use App\Component\Console\Style\Style;
 use App\Component\Filesystem\Path;
-use SR\Exception\Runtime\RuntimeException;
+use App\Utility\Reflection\ReflectionHelper;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
@@ -58,11 +57,6 @@ abstract class AbstractCommand extends Command
     protected const ARG_INTERFACE_NAME = 'interface-name';
 
     /**
-     * @var CmdConfiguration
-     */
-    protected $configuration;
-
-    /**
      * @var string
      */
     private static $sysFsNetRootPath = '/sys/class/net';
@@ -73,10 +67,34 @@ abstract class AbstractCommand extends Command
     private $style;
 
     /**
+     * @var CmdConfiguration
+     */
+    protected $configuration;
+
+    /**
+     * @var bool
+     */
+    protected $enableInteractSanityChecks = true;
+
+    /**
+     * @var bool
+     */
+    protected $enableExecuteSanityChecks = true;
+
+    /**
+     * @var bool
+     */
+    protected $enableGeneralInputDefinition = true;
+
+    /**
      * Setup command name, description, and options/arguments definition.
      */
-    public function configure(): void
+    protected function configure(): void
     {
+        if (method_exists($this, 'configureCommand') && is_callable([$this, 'configureCommand'])) {
+            $this->configureCommand();
+        }
+
         $this->setName($this->c()->getCall());
         $this->setDescription($this->c()->getDesc());
         $this->setDefinition($this->setupInputDefinition());
@@ -102,7 +120,15 @@ abstract class AbstractCommand extends Command
     {
         return null !== $this->configuration
             ? $this->configuration
-            : $this->configuration = new CmdConfiguration(CmdConfiguration::resolveCommandContext($this));
+            : $this->configuration = self::createCommandConfiguration($this);
+    }
+
+    /**
+     * @return bool
+     */
+    final public function isEnabled()
+    {
+        return $this->c()->getLoad();
     }
 
     /**
@@ -110,14 +136,37 @@ abstract class AbstractCommand extends Command
      */
     final public function getApplication(): Application
     {
-        try {
-            ($p = (new \ReflectionClass(Command::class))->getProperty('application'))
-                ->setAccessible(true);
+        return ReflectionHelper::propertyValue(Command::class, 'application', $this);
+    }
 
-            return $p->getValue($this);
-        } catch (\ReflectionException $exception) {
-            throw new RuntimeException('Failed to resolve private "application" property of parent Command class.');
-        }
+    /**
+     * @param Command $command
+     *
+     * @return CmdConfiguration
+     */
+    final public static function createCommandConfiguration(Command $command): CmdConfiguration
+    {
+        return new CmdConfiguration(null, null, self::resolveCommandContext($command));
+    }
+
+    /**
+     * @param Command $command
+     *
+     * @return string
+     */
+    public static function resolveCommandContext(Command $command): string
+    {
+        return mb_strtolower(
+            preg_replace(
+                '/(?<=\\w)(?=[A-Z])/',
+                '-$1',
+                preg_replace(
+                    '/(^Query|DevicesCommand$)/',
+                    '',
+                    ReflectionHelper::reflectObject($command)->getShortName()
+                )
+            )
+        );
     }
 
     /**
@@ -129,15 +178,20 @@ abstract class AbstractCommand extends Command
         $this->s($input, $output);
         $this->s()->applicationTitle($this);
 
-        $interfaces = $this->sanitizeInterfaces($input->getArgument(self::ARG_INTERFACE_NAME));
+        if ($this->enableInteractSanityChecks) {
+            $interfaces = $this->sanitizeInterfaces($input->getArgument(self::ARG_INTERFACE_NAME));
 
-        while (empty($interfaces)) {
-            $interfaces = $this->sanitizeInterfaces(
-                $this->interactiveInterfaceSelection($input, $output, 'wireless', $this->getInterfaceTypeFilterClosure())
-            );
+            while (empty($interfaces)) {
+                $interfaces = $this->sanitizeInterfaces(
+                    $this->interactiveInterfaceSelection(
+                        $this->c()->getInterfaceType(),
+                        $this->getInterfaceTypeFilterClosure()
+                    )
+                );
+            }
+
+            $input->setArgument(self::ARG_INTERFACE_NAME, $interfaces);
         }
-
-        $input->setArgument(self::ARG_INTERFACE_NAME, $interfaces);
     }
 
     /**
@@ -150,65 +204,68 @@ abstract class AbstractCommand extends Command
     {
         $this->s($input, $output);
 
-        if (0 === count($interfaces = $input->getArgument(self::ARG_INTERFACE_NAME))) {
-            $this->s()->error(vsprintf('You must specify one or more %s interface names (valid %1$s interfaces match the regex "%s").', [
-                $this->c()->getInterfaceType(),
-                $this->c()->getInterfaceFind(),
-            ]));
+        if ($this->enableExecuteSanityChecks) {
+            if (0 === count($interfaces = $input->getArgument(self::ARG_INTERFACE_NAME))) {
+                $this->s()->error(vsprintf(
+                    'You must specify one or more %s interface names (valid %1$s interfaces match regex "%s").', [
+                        $this->c()->getInterfaceType(),
+                        $this->c()->getInterfaceFind(),
+                    ]
+                ));
 
-            return 255;
+                return 255;
+            }
+
+            $interfaces = $this->sanitizeInterfaces($interfaces);
         }
 
-        return $this->executeCommand($this->sanitizeInterfaces($interfaces), $input, $output);
+        return $this->executeCommand(
+            $interfaces ?? $this->sanitizeInterfaces($this->retrieveSystemNetworkInterfaces(), false)
+        );
     }
 
     /**
-     * @param array           $interface
-     * @param InputInterface  $input
-     * @param OutputInterface $output
+     * @param array $interface
      *
      * @return int
      */
-    abstract protected function executeCommand(array $interface, InputInterface $input, OutputInterface $output): int;
+    abstract protected function executeCommand(array $interface = []): int;
 
     /**
      * @param array $inputted
+     * @param bool  $notify
      *
      * @return array
      */
-    protected function sanitizeInterfaces(array $inputted): array
+    protected function sanitizeInterfaces(array $inputted, bool $notify = true): array
     {
         $existing = array_values(array_filter(
             $inputted, $this->getInterfaceRealFilterClosure()
         ));
 
-        if (!empty($d = array_diff($inputted, $existing))) {
-            $this->notifyFilteredInterfaceDiff($d, 'Removed unknown-named interfaces: %s (valid %s interfaces found in "%s/*").',
-                $this->c()->getInterfaceType(), self::$sysFsNetRootPath);
+        if ($notify && !empty($d = array_diff($inputted, $existing))) {
+            $this->s()->ifVeryVerbose(function (Style $s) use ($d): void {
+                $s->note(sprintf(
+                    'Removed invalid named interfaces: %s (valid %s interfaces are located in "%s/*").',
+                    $this->implodeQuotedList($d), $this->c()->getInterfaceType(), self::$sysFsNetRootPath
+                ));
+            });
         }
 
         $matching = array_values(array_filter(
             $existing, $this->getInterfaceTypeFilterClosure()
         ));
 
-        if (!empty($d = array_diff($existing, $matching))) {
-            $this->notifyFilteredInterfaceDiff($d, 'Removed invalid-typed interfaces: %s (valid %s interfaces match the regex "%s").',
-                $this->c()->getInterfaceType(), $this->c()->getInterfaceFind());
+        if ($notify && !empty($d = array_diff($existing, $matching))) {
+            $this->s()->ifVeryVerbose(function (Style $s) use ($d): void {
+                $s->note(sprintf(
+                    'Removed invalid typed interfaces: %s (valid %s interfaces must match the regex "%s").',
+                    $this->implodeQuotedList($d), $this->c()->getInterfaceType(), $this->c()->getInterfaceFind()
+                ));
+            });
         }
 
         return $matching;
-    }
-
-    /**
-     * @param array  $listing
-     * @param string $format
-     * @param mixed  ...$replacements
-     */
-    protected function notifyFilteredInterfaceDiff(array $listing, string $format, ...$replacements): void
-    {
-        $this->s()->ifVeryVerbose(function (Style $s) use ($format, $listing, $replacements): void {
-            $s->note(sprintf($format, $this->implodeQuotedList($listing), ...$replacements));
-        });
     }
 
     /**
@@ -217,8 +274,18 @@ abstract class AbstractCommand extends Command
     protected function getInterfaceTypeFilterClosure(): \Closure
     {
         return function (string $name): bool {
-            return 1 === preg_match(sprintf('{%s}', $this->c()->getInterfaceFind()), $name);
+            return $this->isInterfaceTypeMatch($name);
         };
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return bool
+     */
+    protected function isInterfaceTypeMatch(string $name): bool
+    {
+        return 1 === preg_match(sprintf('{%s}', $this->c()->getInterfaceFind()), $name);
     }
 
     /**
@@ -246,21 +313,41 @@ abstract class AbstractCommand extends Command
      *
      * @return array
      */
-    protected function getProcessOutputAsArray(Process $process, \Closure $filter = null, \Closure $mapper = null): array
+    protected function getProcessOutputAsArray(Process $process, \Closure $filter = null, \Closure $mapper = null, \Closure $exploder = null): array
     {
-        return $process->isSuccessful() ? array_values(array_filter(
-            array_map(
-                $mapper ?? function (string $line): string {
-                    return trim($line);
-                },
-                explode(
-                    PHP_EOL, $process->getOutput()
+        return $this->arrayFilterValues(
+            $process->isSuccessful()
+                ? array_map(
+                    $mapper ?? function (string $line): string {
+                        return trim($line);
+                    },
+                    ($exploder ?? function (string $output): array {
+                        return explode(PHP_EOL, $output);
+                    })($process->getOutput())
                 )
-            ),
-            $filter ?? function (string $line): string {
-                return true;
+                : [],
+            $filter ?? function (string $line): bool {
+                return (bool) $line;
             }
-        )) : [];
+        );
+    }
+
+    /**
+     * @param array         $inputs
+     * @param \Closure|null $filter
+     *
+     * @return array
+     */
+    protected function arrayFilterValues(array $inputs, \Closure $filter = null): array
+    {
+        return array_values(
+            array_filter(
+                $inputs,
+                $filter ?? function ($item): bool {
+                    return (bool) $item;
+                }
+            )
+        );
     }
 
     /**
@@ -286,8 +373,6 @@ abstract class AbstractCommand extends Command
     }
 
     /**
-     * @param InputInterface  $input
-     * @param OutputInterface $output
      * @param string          $contextName
      * @param \Closure|null   $contextFilter
      * @param int             $default
@@ -295,9 +380,9 @@ abstract class AbstractCommand extends Command
      * @return array
      * @return array
      */
-    private function interactiveInterfaceSelection(InputInterface $input, OutputInterface $output, string $contextName, \Closure $contextFilter = null, int $default = 0): array
+    private function interactiveInterfaceSelection(string $contextName, \Closure $contextFilter = null, int $default = 0): array
     {
-        $interfaces = $this->getSystemNetworkInterfaces($contextFilter);
+        $interfaces = $this->retrieveSystemNetworkInterfaces($contextFilter);
 
         if (empty($interfaces)) {
             $this->s()->error(sprintf('Unable to locate any %s interfaces on your system! Exiting...', $contextName));
@@ -326,24 +411,33 @@ abstract class AbstractCommand extends Command
 
         $this->s()->ifVerbose(function (Style $s) use ($contextName): void {
             $s->comment(sprintf(
-                'No named %s interfaces were passed as command-line arguments to this script; attempting to determine '.
-                'this required information by falling back to interactive questioning.', $contextName
+                'No named %s interfaces were passed as command-line arguments to this script; attempting to '.
+                'determine this required information by falling back to interactive questioning.', $contextName
             ));
         });
 
-        $result = $this->s()->askQuestion((new ChoiceQuestion(sprintf(
-            '<fg=green>Select the %s interface(s) you would like to query metrics from (defaulting to "%d" as "%s")</>:',
+        $provided = $this->s()->askQuestion((new ChoiceQuestion(sprintf(
+            '<fg=green>Select the %s interface(s) you would like to query metrics from (defaulting to "%d" => "%s")</>:',
             $this->c()->getInterfaceType(), $default, $interfaces[$default]
-        ), $interfaces, '0'))->setMultiselect(true));
+        ), array_merge($interfaces, ['q' => 'Quit']), '0'))->setMultiselect(true));
+
+        if (in_array('q', $provided)) {
+            $this->s()->warning('Halting script execution due to user requested termination.');
+            exit(255);
+        }
+
+        $provided = array_filter(array_map(function ($name) use ($interfaces): string {
+            return $this->isInterfaceTypeMatch($name) ? $name : $interfaces[(int) $name] ?? null;
+        }, $provided));
 
         $this->s()->newLine();
-        $this->s()->ifVerbose(function (Style $s) use ($contextName, $result): void {
+        $this->s()->ifVerbose(function (Style $s) use ($contextName, $provided): void {
             $s->comment(sprintf(
-                    'You selected the following %s interface(s) interactively: %s.', $contextName, $this->implodeQuotedList($result))
-            );
+                'You selected the following %s interface(s) interactively: %s.', $contextName, $this->implodeQuotedList($provided)
+            ));
         });
 
-        return $result;
+        return $provided;
     }
 
     /**
@@ -352,7 +446,7 @@ abstract class AbstractCommand extends Command
      *
      * @return array
      */
-    private function getSystemNetworkInterfaces(\Closure $filter = null, \Closure $mapper = null): array
+    private function retrieveSystemNetworkInterfaces(\Closure $filter = null, \Closure $mapper = null): array
     {
         ($process = self::makeProcess(
             'ls',
@@ -384,10 +478,12 @@ abstract class AbstractCommand extends Command
      */
     private function setupGeneralInputDefinition(InputDefinition $definition): InputDefinition
     {
-        $definition->addArgument(
-            new InputArgument(self::ARG_INTERFACE_NAME, InputArgument::IS_ARRAY,
-                'Named network interfaces to query for the requested information.')
-        );
+        if ($this->enableGeneralInputDefinition) {
+            $definition->addArgument(
+                new InputArgument(self::ARG_INTERFACE_NAME, InputArgument::IS_ARRAY,
+                    'Named network interfaces to query for the requested information.')
+            );
+        }
 
         return $definition;
     }
